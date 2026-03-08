@@ -105540,7 +105540,7 @@ A.aLH.prototype={
 $1(a){var s,r=t.rN.a(a.a),q=this.a,p=t.x.a(q.c.ga0()).dm(a.b)
 q=q.gbs().aj(0,$.lO().gb0(),t.X2)
 s=A.T(q.gak(0),t.b9)
-s.push(new A.dk(B.di.r3(),r.b,r.d,p))
+s.push(new A.dk(B.di.r3(),r.b,r.d,new A.h(p.a-24,p.b-24)))
 q.sak(0,s)
 q.fX()},
 $S:263}
@@ -105589,7 +105589,7 @@ r=$.lO()
 q=this.b
 if(!J.b4Q(s.aj(0,r,t.fM),new A.aLL(q)))return
 p=t.x.a(o.c.ga0()).dm(a.c)
-s.aj(0,r.gb0(),t.X2).aBa(q.a,p)},
+s.aj(0,r.gb0(),t.X2).aBa(q.a,new A.h(p.a-24,p.b-24))},
 $S:744}
 A.aLK.prototype={
 $0(){return this.a.z=!1},
