@@ -105,23 +105,42 @@
 
     window._twitchPlayerSetPlaybackRate = function(id, rate) {
       try {
+        var p = players[id];
+        if (!p) return;
+        // 1. Try Twitch Player API directly
+        if (typeof p.setPlaybackRate === 'function') {
+          p.setPlaybackRate(rate);
+          return;
+        }
+        // 2. Try internal player reference
+        if (p._player && typeof p._player.setPlaybackRate === 'function') {
+          p._player.setPlaybackRate(rate);
+          return;
+        }
+        // 3. Try the underlying <video> element via the container div
         var el = document.getElementById(id);
         if (!el) return;
         var video = el.querySelector('video');
         if (video) { video.playbackRate = rate; return; }
-        // Fallback: try iframe's contentDocument
+        // 4. Try reaching into the iframe
         var iframe = el.querySelector('iframe');
         if (iframe) {
           try {
             var v = iframe.contentDocument && iframe.contentDocument.querySelector('video');
-            if (v) v.playbackRate = rate;
-          } catch(e2) { /* cross-origin — ignore */ }
+            if (v) { v.playbackRate = rate; return; }
+          } catch(e2) { /* cross-origin */ }
+          // 5. postMessage fallback (Twitch may handle this internally)
+          try { iframe.contentWindow.postMessage({ type: 'setPlaybackRate', rate: rate }, '*'); }
+          catch(e3) {}
         }
       } catch(e) { console.warn('[TwitchBridge] setPlaybackRate error:', e); }
     };
 
     window._twitchPlayerGetPlaybackRate = function(id) {
       try {
+        var p = players[id];
+        if (!p) return 1;
+        if (typeof p.getPlaybackRate === 'function') return p.getPlaybackRate();
         var el = document.getElementById(id);
         if (!el) return 1;
         var video = el.querySelector('video');
