@@ -71,6 +71,11 @@
     };
 
     window._destroyTwitchPlayer = function(id) {
+      // Clean up speed simulation if active for this player
+      if (window._twitchSpeedSim && window._twitchSpeedSim.id === id) {
+        clearInterval(window._twitchSpeedSim.timer);
+        window._twitchSpeedSim = null;
+      }
       var p = players[id];
       if (p) { try { p.destroy(); } catch(e) {} }
       delete players[id];
@@ -105,46 +110,44 @@
 
     window._twitchPlayerSetPlaybackRate = function(id, rate) {
       try {
+        // Clear any existing speed simulation
+        if (window._twitchSpeedSim && window._twitchSpeedSim.timer) {
+          clearInterval(window._twitchSpeedSim.timer);
+          window._twitchSpeedSim = null;
+        }
+
         var p = players[id];
         if (!p) return;
-        // 1. Try Twitch Player API directly
-        if (typeof p.setPlaybackRate === 'function') {
-          p.setPlaybackRate(rate);
-          return;
-        }
-        // 2. Try internal player reference
-        if (p._player && typeof p._player.setPlaybackRate === 'function') {
-          p._player.setPlaybackRate(rate);
-          return;
-        }
-        // 3. Try the underlying <video> element via the container div
-        var el = document.getElementById(id);
-        if (!el) return;
-        var video = el.querySelector('video');
-        if (video) { video.playbackRate = rate; return; }
-        // 4. Try reaching into the iframe
-        var iframe = el.querySelector('iframe');
-        if (iframe) {
+
+        // Normal speed – nothing to simulate
+        if (rate === 1.0) return;
+
+        // Twitch iframe is cross-origin so we can't touch the <video> element.
+        // Simulate speed changes by periodically seeking.
+        var intervalMs = 250;
+        var timer = setInterval(function() {
           try {
-            var v = iframe.contentDocument && iframe.contentDocument.querySelector('video');
-            if (v) { v.playbackRate = rate; return; }
-          } catch(e2) { /* cross-origin */ }
-          // 5. postMessage fallback (Twitch may handle this internally)
-          try { iframe.contentWindow.postMessage({ type: 'setPlaybackRate', rate: rate }, '*'); }
-          catch(e3) {}
-        }
+            if (!p || (typeof p.isPaused === 'function' && p.isPaused())) return;
+            var t = (typeof p.getCurrentTime === 'function') ? p.getCurrentTime() : 0;
+            // extra = (rate - 1) * interval_seconds
+            // For 2x: advance extra 0.25s every 0.25s (double speed)
+            // For 0.5x: rewind 0.125s every 0.25s (half speed)
+            var extra = (rate - 1.0) * (intervalMs / 1000);
+            var target = t + extra;
+            if (target < 0) target = 0;
+            if (typeof p.seek === 'function') p.seek(target);
+          } catch(e) {}
+        }, intervalMs);
+        window._twitchSpeedSim = { id: id, rate: rate, timer: timer };
       } catch(e) { console.warn('[TwitchBridge] setPlaybackRate error:', e); }
     };
 
     window._twitchPlayerGetPlaybackRate = function(id) {
       try {
-        var p = players[id];
-        if (!p) return 1;
-        if (typeof p.getPlaybackRate === 'function') return p.getPlaybackRate();
-        var el = document.getElementById(id);
-        if (!el) return 1;
-        var video = el.querySelector('video');
-        if (video) return video.playbackRate;
+        // Return the simulated rate if active
+        if (window._twitchSpeedSim && window._twitchSpeedSim.id === id) {
+          return window._twitchSpeedSim.rate;
+        }
         return 1;
       } catch(e) { return 1; }
     };
