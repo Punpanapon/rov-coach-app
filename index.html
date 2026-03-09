@@ -71,11 +71,6 @@
     };
 
     window._destroyTwitchPlayer = function(id) {
-      // Clean up speed simulation if active for this player
-      if (window._twitchSpeedSim && window._twitchSpeedSim.id === id) {
-        clearInterval(window._twitchSpeedSim.timer);
-        window._twitchSpeedSim = null;
-      }
       var p = players[id];
       if (p) { try { p.destroy(); } catch(e) {} }
       delete players[id];
@@ -108,48 +103,15 @@
       catch(e) { console.warn('[TwitchBridge] seek error:', e); }
     };
 
-    window._twitchPlayerSetPlaybackRate = function(id, rate) {
+    window._twitchPlayerSkip = function(id, deltaSec) {
       try {
-        // Clear any existing speed simulation
-        if (window._twitchSpeedSim && window._twitchSpeedSim.timer) {
-          clearInterval(window._twitchSpeedSim.timer);
-          window._twitchSpeedSim = null;
-        }
-
         var p = players[id];
         if (!p) return;
-
-        // Normal speed – nothing to simulate
-        if (rate === 1.0) return;
-
-        // Twitch iframe is cross-origin so we can't touch the <video> element.
-        // Simulate speed changes by periodically seeking.
-        var intervalMs = 250;
-        var timer = setInterval(function() {
-          try {
-            if (!p || (typeof p.isPaused === 'function' && p.isPaused())) return;
-            var t = (typeof p.getCurrentTime === 'function') ? p.getCurrentTime() : 0;
-            // extra = (rate - 1) * interval_seconds
-            // For 2x: advance extra 0.25s every 0.25s (double speed)
-            // For 0.5x: rewind 0.125s every 0.25s (half speed)
-            var extra = (rate - 1.0) * (intervalMs / 1000);
-            var target = t + extra;
-            if (target < 0) target = 0;
-            if (typeof p.seek === 'function') p.seek(target);
-          } catch(e) {}
-        }, intervalMs);
-        window._twitchSpeedSim = { id: id, rate: rate, timer: timer };
-      } catch(e) { console.warn('[TwitchBridge] setPlaybackRate error:', e); }
-    };
-
-    window._twitchPlayerGetPlaybackRate = function(id) {
-      try {
-        // Return the simulated rate if active
-        if (window._twitchSpeedSim && window._twitchSpeedSim.id === id) {
-          return window._twitchSpeedSim.rate;
-        }
-        return 1;
-      } catch(e) { return 1; }
+        var t = (typeof p.getCurrentTime === 'function') ? p.getCurrentTime() : 0;
+        var target = t + deltaSec;
+        if (target < 0) target = 0;
+        if (typeof p.seek === 'function') p.seek(target);
+      } catch(e) { console.warn('[TwitchBridge] skip error:', e); }
     };
   })();
   </script>
