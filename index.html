@@ -41,6 +41,65 @@
   <link rel="manifest" href="manifest.json">
 </head>
 <body>
+  <!-- Twitch Player JS SDK + control bridge for PIP sync -->
+  <script src="https://player.twitch.tv/js/embed/v1.js"></script>
+  <script>
+  (function() {
+    var players = window._twitchPlayers = {};
+
+    window._createTwitchPlayer = function(id, videoId, muted, time, autoplay) {
+      function tryInit() {
+        if (typeof Twitch === 'undefined' || !Twitch.Player) {
+          setTimeout(tryInit, 200);
+          return;
+        }
+        var el = document.getElementById(id);
+        if (!el) { requestAnimationFrame(tryInit); return; }
+        el.innerHTML = '';
+        var opts = {
+          video: videoId,
+          width: '100%',
+          height: '100%',
+          autoplay: !!autoplay,
+          muted: !!muted
+        };
+        if (time) opts.time = time;
+        try { players[id] = new Twitch.Player(id, opts); }
+        catch (e) { console.warn('[TwitchBridge]', e); }
+      }
+      setTimeout(tryInit, 50);
+    };
+
+    window._destroyTwitchPlayer = function(id) {
+      var p = players[id];
+      if (p) { try { p.destroy(); } catch(e) {} }
+      delete players[id];
+    };
+
+    window._getTwitchPlayerTime = function(id) {
+      var p = players[id];
+      return (p && p.getCurrentTime) ? p.getCurrentTime() : 0;
+    };
+
+    window._isTwitchPlayerPaused = function(id) {
+      var p = players[id];
+      return (p && p.isPaused) ? p.isPaused() : true;
+    };
+
+    window._twitchPlayerPlay = function(id) {
+      var p = players[id]; if (p && p.play) p.play();
+    };
+
+    window._twitchPlayerPause = function(id) {
+      var p = players[id]; if (p && p.pause) p.pause();
+    };
+
+    window._twitchPlayerSeek = function(id, seconds) {
+      var p = players[id]; if (p && p.seek) p.seek(seconds);
+    };
+  })();
+  </script>
+
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
