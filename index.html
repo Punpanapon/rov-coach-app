@@ -82,20 +82,25 @@
     };
 
     window._isTwitchPlayerPaused = function(id) {
-      var p = players[id];
-      return (p && p.isPaused) ? p.isPaused() : true;
+      try {
+        var p = players[id];
+        return (p && typeof p.isPaused === 'function') ? p.isPaused() : true;
+      } catch(e) { console.warn('[TwitchBridge] isPaused error:', e); return true; }
     };
 
     window._twitchPlayerPlay = function(id) {
-      var p = players[id]; if (p && p.play) p.play();
+      try { var p = players[id]; if (p && typeof p.play === 'function') p.play(); }
+      catch(e) { console.warn('[TwitchBridge] play error:', e); }
     };
 
     window._twitchPlayerPause = function(id) {
-      var p = players[id]; if (p && p.pause) p.pause();
+      try { var p = players[id]; if (p && typeof p.pause === 'function') p.pause(); }
+      catch(e) { console.warn('[TwitchBridge] pause error:', e); }
     };
 
     window._twitchPlayerSeek = function(id, seconds) {
-      var p = players[id]; if (p && p.seek) p.seek(seconds);
+      try { var p = players[id]; if (p && typeof p.seek === 'function') p.seek(seconds); }
+      catch(e) { console.warn('[TwitchBridge] seek error:', e); }
     };
   })();
   </script>
