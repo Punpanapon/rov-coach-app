@@ -87,6 +87,23 @@ class ActiveStrokeWidthNotifier extends Notifier<double> {
 }
 
 // ---------------------------------------------------------------------------
+// Toolbar playback skip duration (seconds)
+// ---------------------------------------------------------------------------
+
+final skipDurationProvider =
+    NotifierProvider<SkipDurationNotifier, int>(SkipDurationNotifier.new);
+
+class SkipDurationNotifier extends Notifier<int> {
+  @override
+  int build() => 10;
+
+  void set(int seconds) {
+    if (seconds <= 0) return;
+    state = seconds;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Permanent strokes with undo / redo history + Firestore sync
 // ---------------------------------------------------------------------------
 
@@ -897,6 +914,7 @@ const defaultToolbarOrder = <String>[
   'fullscreen',
   'screen_share',
   'instant_replay',
+  'record_scrim',
   'broadcast',
   'watch_stream',
   'hotkey_settings',
