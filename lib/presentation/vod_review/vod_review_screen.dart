@@ -37,6 +37,7 @@ class VodReviewScreen extends ConsumerStatefulWidget {
 }
 
 class _VodReviewScreenState extends ConsumerState<VodReviewScreen> {
+  static const bool _localPlaybackOnly = true;
   final _urlController = TextEditingController();
   final _skipDurationController = TextEditingController(text: '10');
   final _skipDurationFocusNode = FocusNode();
@@ -179,13 +180,6 @@ class _VodReviewScreenState extends ConsumerState<VodReviewScreen> {
   }
 
   void _loadVideo() {
-    if (ref.read(vodSyncRoleProvider).isClient) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Only the Host can change the synced video.')),
-      );
-      return;
-    }
-
     final url = _urlController.text.trim();
     if (url.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -200,13 +194,6 @@ class _VodReviewScreenState extends ConsumerState<VodReviewScreen> {
   }
 
   Future<void> _pickAndUploadVideo() async {
-    if (ref.read(vodSyncRoleProvider).isClient) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Only the Host can upload/change synced video.')),
-      );
-      return;
-    }
-
     try {
       setState(() => _uploadingVideo = true);
 
@@ -272,6 +259,7 @@ class _VodReviewScreenState extends ConsumerState<VodReviewScreen> {
     required bool isPlaying,
     required double position,
   }) async {
+    if (_localPlaybackOnly) return;
     final url = _videoUrl;
     if (url == null || url.trim().isEmpty) return;
     await ref.read(vodSyncControllerProvider.notifier).broadcastState(
@@ -357,7 +345,9 @@ class _VodReviewScreenState extends ConsumerState<VodReviewScreen> {
 
     // Listen to Firestore streams and push remote changes into local notifiers.
     _listenToFirestoreStreams();
-    _listenToVodSync();
+    if (!_localPlaybackOnly) {
+      _listenToVodSync();
+    }
 
     return Listener(
       onPointerDown: _onPointerDown,
@@ -412,6 +402,7 @@ class _VodReviewScreenState extends ConsumerState<VodReviewScreen> {
   }
 
   void _listenToVodSync() {
+    if (_localPlaybackOnly) return;
     ref.listen(vodSyncProvider, (_, next) {
       final role = ref.read(vodSyncRoleProvider);
       if (!role.isClient) return;
@@ -519,13 +510,6 @@ class _VodReviewScreenState extends ConsumerState<VodReviewScreen> {
   }
 
   void _loadBookmark(VodBookmark bookmark) {
-    if (ref.read(vodSyncRoleProvider).isClient) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Only the Host can change the synced video.')),
-      );
-      return;
-    }
-
     if (bookmark.url.trim().isNotEmpty) {
       setState(() => _videoUrl = bookmark.url.trim());
       _urlController.text = bookmark.url;
@@ -949,10 +933,18 @@ class _VodReviewScreenState extends ConsumerState<VodReviewScreen> {
                     child: SmartVideoPlayer(
                       url: _videoUrl!,
                       interactive: !isBoardMode,
-                      syncState: ref.watch(vodSyncProvider).asData?.value,
+                      syncState:
+                          _localPlaybackOnly ? null : ref.watch(vodSyncProvider).asData?.value,
                       localClientId:
                           ref.watch(vodSyncClientIdProvider).asData?.value,
-                      role: ref.watch(vodSyncRoleProvider),
+                      role: _localPlaybackOnly
+                          ? const VodSyncRole(
+                              isHost: false,
+                              isClient: false,
+                              hostId: '',
+                              hostName: '',
+                            )
+                          : ref.watch(vodSyncRoleProvider),
                       bridge: _playerBridge,
                       onPlaybackAction: ({required isPlaying, required position}) {
                         return _broadcastSyncState(
@@ -1485,7 +1477,6 @@ class _VodReviewScreenState extends ConsumerState<VodReviewScreen> {
       case 'extract_video':
         ref.read(drawingToolProvider.notifier).set(DrawingTool.extractVideo);
       case 'play_pause':
-        if (ref.read(vodSyncRoleProvider).isClient) return;
         if (!_playerBridge.hasActiveVideo.value) return;
         final action = _playerBridge.togglePlayPause;
         if (action == null) return;
@@ -1499,7 +1490,6 @@ class _VodReviewScreenState extends ConsumerState<VodReviewScreen> {
   }
 
   Future<void> _seekBySeconds(double delta) async {
-    if (ref.read(vodSyncRoleProvider).isClient) return;
     if (!_playerBridge.hasActiveVideo.value) return;
     final seek = _playerBridge.seekTo;
     if (seek == null) return;
@@ -1691,7 +1681,7 @@ class _VodReviewScreenState extends ConsumerState<VodReviewScreen> {
               onTap: () =>
                   ref.read(boardModeProvider.notifier).set(BoardMode.board),
             ),
-        'play_pause' => _playerBridge.hasActiveVideo.value && !role.isClient
+        'play_pause' => _playerBridge.hasActiveVideo.value
             ? Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -1756,7 +1746,9 @@ class _VodReviewScreenState extends ConsumerState<VodReviewScreen> {
             : null,
         'skip_back' => null,
         'skip_forward' => null,
-        'sync_playback' => !role.hasHost
+        'sync_playback' => _localPlaybackOnly
+          ? null
+          : !role.hasHost
             ? _ToolbarIcon(
                 icon: Icons.cast,
                 tooltip: 'Start Hosting',
