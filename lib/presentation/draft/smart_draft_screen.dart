@@ -57,6 +57,7 @@ class _SetupPhaseState extends ConsumerState<_SetupPhase> {
   final _redraftCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
   DraftMode _draftMode = DraftMode.global;
+  AutoDraftMode _autoDraftMode = AutoDraftMode.custom;
 
   @override
   void dispose() {
@@ -135,8 +136,49 @@ class _SetupPhaseState extends ConsumerState<_SetupPhase> {
                 ),
                 const SizedBox(height: 24),
 
-                // Draft mode toggle
-                Text('Draft Mode',
+                // Auto-draft mode toggle
+                Text('Draft Sequence',
+                    style: Theme.of(context).textTheme.titleSmall),
+                const SizedBox(height: 8),
+                SegmentedButton<AutoDraftMode>(
+                  segments: const [
+                    ButtonSegment(
+                      value: AutoDraftMode.firstPick,
+                      label: Text('1st Pick'),
+                      icon: Icon(Icons.looks_one, size: 16),
+                    ),
+                    ButtonSegment(
+                      value: AutoDraftMode.secondPick,
+                      label: Text('2nd Pick'),
+                      icon: Icon(Icons.looks_two, size: 16),
+                    ),
+                    ButtonSegment(
+                      value: AutoDraftMode.custom,
+                      label: Text('Custom'),
+                      icon: Icon(Icons.tune, size: 16),
+                    ),
+                  ],
+                  selected: {_autoDraftMode},
+                  onSelectionChanged: (v) =>
+                      setState(() => _autoDraftMode = v.first),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _autoDraftMode == AutoDraftMode.custom
+                      ? 'Manual mode — freely select bans and picks on either side.'
+                      : _autoDraftMode == AutoDraftMode.firstPick
+                          ? 'Auto-sequence: your team has first pick. Follows standard RoV B/P order.'
+                          : 'Auto-sequence: enemy team has first pick. Follows standard RoV B/P order.',
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodySmall
+                      ?.copyWith(color: cs.onSurfaceVariant),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+
+                // Hero lock mode toggle
+                Text('Hero Lock Mode',
                     style: Theme.of(context).textTheme.titleSmall),
                 const SizedBox(height: 8),
                 SegmentedButton<DraftMode>(
@@ -201,6 +243,7 @@ class _SetupPhaseState extends ConsumerState<_SetupPhase> {
           redraftGames: redraftSet,
           matchNotes: _notesCtrl.text.trim(),
           draftMode: _draftMode,
+          autoDraftMode: _autoDraftMode,
         );
   }
 }
@@ -303,6 +346,35 @@ class _DraftingPhaseState extends ConsumerState<_DraftingPhase> {
               ),
             ),
           const SizedBox(width: 4),
+          // ── Mid-draft mode switcher ──
+          SegmentedButton<AutoDraftMode>(
+            segments: const [
+              ButtonSegment(
+                value: AutoDraftMode.firstPick,
+                label: Text('1st', style: TextStyle(fontSize: 11)),
+                icon: Icon(Icons.looks_one, size: 14),
+              ),
+              ButtonSegment(
+                value: AutoDraftMode.secondPick,
+                label: Text('2nd', style: TextStyle(fontSize: 11)),
+                icon: Icon(Icons.looks_two, size: 14),
+              ),
+              ButtonSegment(
+                value: AutoDraftMode.custom,
+                label: Text('Free', style: TextStyle(fontSize: 11)),
+                icon: Icon(Icons.tune, size: 14),
+              ),
+            ],
+            selected: {state.autoDraftMode},
+            onSelectionChanged: (v) => ref
+                .read(scrimDraftProvider.notifier)
+                .switchAutoDraftMode(v.first),
+            style: SegmentedButton.styleFrom(
+              visualDensity: VisualDensity.compact,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+          ),
+          const SizedBox(width: 8),
           FilledButton.tonal(
             onPressed: () => _confirmEndGame(context),
             child: Text(state.currentGame >= state.totalGames
@@ -314,6 +386,9 @@ class _DraftingPhaseState extends ConsumerState<_DraftingPhase> {
       ),
       body: Column(
         children: [
+          // ── Auto-draft turn indicator ──
+          if (state.isAutoMode) _buildAutoTurnBanner(state, cs),
+
           // ── Toolbar: tool toggle + legend ──
           _buildToolbar(context, state, cs, duoEnabled, isGrouped),
 
@@ -447,6 +522,71 @@ class _DraftingPhaseState extends ConsumerState<_DraftingPhase> {
     );
   }
 
+  /// Auto-draft turn indicator banner.
+  Widget _buildAutoTurnBanner(ScrimDraftState state, ColorScheme cs) {
+    final turn = state.currentAutoTurn;
+    final isComplete = state.isSequenceComplete;
+    final isOurTurn = state.currentAutoSide == DraftSide.our;
+    final isBan = turn == AutoDraftTurn.ourBan || turn == AutoDraftTurn.enemyBan;
+
+    final bgColor = isComplete
+        ? Colors.green.withAlpha(30)
+        : isBan
+            ? cs.error.withAlpha(25)
+            : (isOurTurn ? Colors.blue.withAlpha(25) : Colors.red.withAlpha(25));
+    final textColor = isComplete
+        ? Colors.green
+        : isBan
+            ? cs.error
+            : (isOurTurn ? Colors.blue : Colors.red);
+    final icon = isComplete
+        ? Icons.check_circle
+        : isBan
+            ? Icons.block
+            : Icons.check_circle_outline;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      color: bgColor,
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: textColor),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              state.currentTurnLabel,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+                color: textColor,
+              ),
+            ),
+          ),
+          Text(
+            state.autoDraftMode == AutoDraftMode.firstPick ? '1st Pick' : '2nd Pick',
+            style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+          ),
+          if (state.sequenceIndex > 0) ...[
+            const SizedBox(width: 8),
+            SizedBox(
+              height: 28,
+              child: OutlinedButton.icon(
+                onPressed: () => ref.read(scrimDraftProvider.notifier).undoLastAutoPick(),
+                icon: const Icon(Icons.undo, size: 14),
+                label: const Text('Undo', style: TextStyle(fontSize: 11)),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _buildToolbar(
       BuildContext context, ScrimDraftState state, ColorScheme cs,
       bool duoEnabled, bool isGrouped) {
@@ -460,27 +600,38 @@ class _DraftingPhaseState extends ConsumerState<_DraftingPhase> {
       color: cs.surfaceContainerHighest.withAlpha(80),
       child: Row(
         children: [
-          _ToolButton(
-            icon: Icons.block,
-            label: 'Ban',
-            color: cs.error,
-            selected: state.activeTool == DraftTool.ban,
-            count: totalBans,
-            onTap: () => ref
-                .read(scrimDraftProvider.notifier)
-                .setTool(DraftTool.ban),
-          ),
-          const SizedBox(width: 8),
-          _ToolButton(
-            icon: Icons.check_circle_outline,
-            label: 'Pick',
-            color: cs.primary,
-            selected: state.activeTool == DraftTool.pick,
-            count: totalCurrentPicks,
-            onTap: () => ref
-                .read(scrimDraftProvider.notifier)
-                .setTool(DraftTool.pick),
-          ),
+          // In auto mode, show counts only (no toggle). In custom mode, show tool buttons.
+          if (!state.isAutoMode) ...[
+            _ToolButton(
+              icon: Icons.block,
+              label: 'Ban',
+              color: cs.error,
+              selected: state.activeTool == DraftTool.ban,
+              count: totalBans,
+              onTap: () => ref
+                  .read(scrimDraftProvider.notifier)
+                  .setTool(DraftTool.ban),
+            ),
+            const SizedBox(width: 8),
+            _ToolButton(
+              icon: Icons.check_circle_outline,
+              label: 'Pick',
+              color: cs.primary,
+              selected: state.activeTool == DraftTool.pick,
+              count: totalCurrentPicks,
+              onTap: () => ref
+                  .read(scrimDraftProvider.notifier)
+                  .setTool(DraftTool.pick),
+            ),
+          ] else ...[
+            Icon(Icons.block, size: 16, color: cs.error),
+            const SizedBox(width: 4),
+            Text('$totalBans', style: TextStyle(fontSize: 12, color: cs.error, fontWeight: FontWeight.bold)),
+            const SizedBox(width: 12),
+            Icon(Icons.check_circle_outline, size: 16, color: cs.primary),
+            const SizedBox(width: 4),
+            Text('$totalCurrentPicks', style: TextStyle(fontSize: 12, color: cs.primary, fontWeight: FontWeight.bold)),
+          ],
           const SizedBox(width: 12),
           // Duo Scroll toggle
           Tooltip(
@@ -698,7 +849,7 @@ class _MatchResultDialogState extends ConsumerState<_MatchResultDialog> {
       note: _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
     );
 
-    await ref.read(gameResultsProvider.notifier).addResult(result);
+    await ref.read(gameResultWriterProvider).addResult(result);
 
     if (mounted) {
       Navigator.pop(context);
@@ -1148,38 +1299,72 @@ class _TeamGrid extends ConsumerWidget {
     final tileSize = (64 * zoom).roundToDouble();
     final spacing = 6 * (tileSize / 64);
 
+    // Determine if this team's header should glow (active turn)
+    final isActiveTeam = state.isAutoMode &&
+        !state.isSequenceComplete &&
+        state.currentAutoSide == side;
+    final isInactiveTeam = state.isAutoMode &&
+        !state.isSequenceComplete &&
+        state.currentAutoSide != null &&
+        state.currentAutoSide != side;
+
     return Column(
       children: [
-        // ── Team header ──
-        Container(
+        // ── Team header with glow ──
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 350),
+          curve: Curves.easeInOut,
           width: double.infinity,
           padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
-          color: teamColor.withAlpha(20),
-          child: Row(
-            children: [
-              Icon(isOur ? Icons.shield : Icons.flag,
-                  size: 14, color: teamColor),
-              const SizedBox(width: 6),
-              Text(isOur ? 'Our Team' : 'Enemy Team',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
-                    color: teamColor,
-                  )),
-              const Spacer(),
-              if (lockedPicks.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: Text(
-                    '\u{1F512}${lockedPicks.length}',
-                    style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+          decoration: BoxDecoration(
+            color: isActiveTeam
+                ? teamColor.withAlpha(40)
+                : teamColor.withAlpha(isInactiveTeam ? 8 : 20),
+            boxShadow: isActiveTeam
+                ? [
+                    BoxShadow(
+                      color: teamColor.withOpacity(0.6),
+                      blurRadius: 12,
+                      spreadRadius: 4,
+                    ),
+                  ]
+                : [],
+          ),
+          child: AnimatedOpacity(
+            duration: const Duration(milliseconds: 300),
+            opacity: isInactiveTeam ? 0.45 : 1.0,
+            child: Row(
+              children: [
+                if (isActiveTeam)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 4),
+                    child: Icon(Icons.play_arrow,
+                        size: 16, color: teamColor),
                   ),
+                Icon(isOur ? Icons.shield : Icons.flag,
+                    size: 14, color: teamColor),
+                const SizedBox(width: 6),
+                Text(isOur ? 'Our Team' : 'Enemy Team',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                      color: teamColor,
+                    )),
+                const Spacer(),
+                if (lockedPicks.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: Text(
+                      '\u{1F512}${lockedPicks.length}',
+                      style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+                    ),
+                  ),
+                Text(
+                  'B:${currentBans.length}  P:${currentPicks.length}',
+                  style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
                 ),
-              Text(
-                'B:${currentBans.length}  P:${currentPicks.length}',
-                style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
 
@@ -1537,6 +1722,42 @@ class _HeroTileState extends ConsumerState<_HeroTile>
   }
 
   void _onTap() {
+    final state = ref.read(scrimDraftProvider);
+
+    bool isBanPhase;
+    bool isOurTurn;
+    if (state.isAutoMode) {
+      final turn = state.currentAutoTurn;
+      if (turn == null) return;
+      isBanPhase =
+          turn == AutoDraftTurn.ourBan || turn == AutoDraftTurn.enemyBan;
+      isOurTurn =
+          turn == AutoDraftTurn.ourBan || turn == AutoDraftTurn.ourPick;
+    } else {
+      isBanPhase = state.activeTool == DraftTool.ban;
+      isOurTurn = widget.side == DraftSide.our;
+    }
+
+    final disabled = ref.read(scrimDraftProvider.notifier).isHeroDisabled(
+          widget.hero.name,
+          isBanPhase: isBanPhase,
+          isOurTurn: isOurTurn,
+          isGlobalBanPickMode: state.draftMode == DraftMode.global,
+        );
+    if (disabled) return;
+
+    // Auto-draft mode: route through auto handler
+    if (state.isAutoMode) {
+      // Only accept taps on the correct side for the current turn
+      if (state.currentAutoSide != widget.side) return;
+      // Sequence complete — no more taps
+      if (state.isSequenceComplete) return;
+      _animCtrl.forward(from: 0);
+      ref.read(scrimDraftProvider.notifier).handleAutoHeroSelected(widget.hero.name);
+      return;
+    }
+
+    // Custom (manual) mode: old behavior
     _animCtrl.forward(from: 0);
     ref
         .read(scrimDraftProvider.notifier)
@@ -1546,16 +1767,40 @@ class _HeroTileState extends ConsumerState<_HeroTile>
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final state = ref.watch(scrimDraftProvider);
     final hero = widget.hero;
-    final isLocked = widget.isLocked;
     final isCurrentPick = widget.isCurrentPick;
     final isBanned = widget.isBanned;
-    final isCrossTeamBlocked = widget.isCrossTeamBlocked;
+
+    bool isBanPhase;
+    bool isOurTurn;
+    if (state.isAutoMode) {
+      final turn = state.currentAutoTurn;
+      if (turn == null) {
+        isBanPhase = true;
+        isOurTurn = widget.side == DraftSide.our;
+      } else {
+        isBanPhase =
+            turn == AutoDraftTurn.ourBan || turn == AutoDraftTurn.enemyBan;
+        isOurTurn =
+            turn == AutoDraftTurn.ourBan || turn == AutoDraftTurn.ourPick;
+      }
+    } else {
+      isBanPhase = state.activeTool == DraftTool.ban;
+      isOurTurn = widget.side == DraftSide.our;
+    }
+
+    final isDisabled = ref.watch(scrimDraftProvider.notifier).isHeroDisabled(
+          hero.name,
+          isBanPhase: isBanPhase,
+          isOurTurn: isOurTurn,
+          isGlobalBanPickMode: state.draftMode == DraftMode.global,
+        );
 
     Widget portrait = _buildPortrait(hero, cs, _tileSize);
 
-    // ── LOCKED (global) or CROSS-TEAM blocked: greyscale + faded + IgnorePointer ──
-    if (isLocked || isCrossTeamBlocked) {
+    // Contextual disabled state: greyscale + faded + non-interactive.
+    if (isDisabled) {
       return IgnorePointer(
         child: SizedBox(
           width: _tileSize,
@@ -1573,22 +1818,13 @@ class _HeroTileState extends ConsumerState<_HeroTile>
                     child: Stack(
                       children: [
                         portrait,
-                        if (isLocked)
-                          Positioned(
-                            right: 2,
-                            top: 2,
-                            child: Icon(Icons.lock,
-                                size: 14,
-                                color: Colors.white.withAlpha(180)),
-                          ),
-                        if (isCrossTeamBlocked && !isLocked)
-                          Positioned(
-                            right: 2,
-                            top: 2,
-                            child: Icon(Icons.block,
-                                size: 14,
-                                color: Colors.white.withAlpha(180)),
-                          ),
+                        Positioned(
+                          right: 2,
+                          top: 2,
+                          child: Icon(Icons.block,
+                              size: 14,
+                              color: Colors.white.withAlpha(180)),
+                        ),
                       ],
                     ),
                   ),
