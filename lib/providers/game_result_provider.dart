@@ -1,21 +1,20 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:rov_coach/data/models/game_result.dart';
-import 'package:rov_coach/data/repositories/game_result_repository.dart';
+import 'package:rov_coach/data/services/migration_service.dart';
 import 'package:rov_coach/providers/room_provider.dart';
 
-final gameResultRepositoryProvider = Provider<GameResultRepository>((ref) {
-  return GameResultRepository();
-});
-
-final gameResultsProvider =
-    AsyncNotifierProvider<GameResultsNotifier, List<GameResult>>(
-        GameResultsNotifier.new);
-
+// ---------------------------------------------------------------------------
+// Firestore real-time stream — the single source of truth for ALL tabs
+// ---------------------------------------------------------------------------
 final firestoreMatchResultsProvider =
     StreamProvider<List<GameResult>>((ref) {
   final roomId = ref.watch(roomIdProvider);
   if (roomId == null) return Stream.value(const <GameResult>[]);
+
+  // Kick off one-time migration in the background (fire-and-forget).
+  // It's idempotent, so safe even if multiple widgets trigger it.
+  MigrationService.migrateLocalResultsToFirestore(roomId);
 
   return FirebaseFirestore.instance
       .collection('rooms')
@@ -32,6 +31,9 @@ final firestoreMatchResultsProvider =
   });
 });
 
+// ---------------------------------------------------------------------------
+// Hero selection state for Analytics deep-dive
+// ---------------------------------------------------------------------------
 final selectedAnalysisHeroesProvider =
     NotifierProvider<SelectedAnalysisHeroesNotifier, List<String>>(
         SelectedAnalysisHeroesNotifier.new);
@@ -53,11 +55,19 @@ class SelectedAnalysisHeroesNotifier extends Notifier<List<String>> {
   }
 }
 
-class GameResultsNotifier extends AsyncNotifier<List<GameResult>> {
-  GameResultRepository get _repo => ref.read(gameResultRepositoryProvider);
+// ---------------------------------------------------------------------------
+// Write-operation helper — Firestore-first (no more Hive writes)
+// ---------------------------------------------------------------------------
+final gameResultWriterProvider = Provider<GameResultWriter>((ref) {
+  return GameResultWriter(ref);
+});
 
-  CollectionReference<Map<String, dynamic>>? _matchResultsCollection() {
-    final roomId = ref.read(roomIdProvider);
+class GameResultWriter {
+  final Ref _ref;
+  GameResultWriter(this._ref);
+
+  CollectionReference<Map<String, dynamic>>? _col() {
+    final roomId = _ref.read(roomIdProvider);
     if (roomId == null) return null;
     return FirebaseFirestore.instance
         .collection('rooms')
@@ -65,41 +75,24 @@ class GameResultsNotifier extends AsyncNotifier<List<GameResult>> {
         .collection('match_results');
   }
 
-  @override
-  Future<List<GameResult>> build() async {
-    return _repo.getAll();
-  }
-
   Future<void> addResult(GameResult result) async {
-    await _repo.save(result);
-
-    final col = _matchResultsCollection();
+    final col = _col();
     if (col != null) {
       await col.doc(result.id).set(result.toJson());
     }
-
-    state = AsyncData(await _repo.getAll());
   }
 
   Future<void> updateResult(GameResult result) async {
-    await _repo.save(result);
-
-    final col = _matchResultsCollection();
+    final col = _col();
     if (col != null) {
       await col.doc(result.id).set(result.toJson(), SetOptions(merge: true));
     }
-
-    state = AsyncData(await _repo.getAll());
   }
 
   Future<void> removeResult(String id) async {
-    await _repo.delete(id);
-
-    final col = _matchResultsCollection();
+    final col = _col();
     if (col != null) {
       await col.doc(id).delete();
     }
-
-    state = AsyncData(await _repo.getAll());
   }
 }

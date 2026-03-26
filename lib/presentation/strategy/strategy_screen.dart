@@ -8,6 +8,7 @@ import 'package:rov_coach/providers/strategy_provider.dart';
 import 'package:rov_coach/providers/scrim_provider.dart';
 import 'package:rov_coach/providers/vod_review_provider.dart';
 import 'package:rov_coach/data/models/vod_review.dart';
+import 'package:rov_coach/data/models/strategy.dart';
 import 'package:rov_coach/presentation/strategy/strategy_form_screen.dart';
 import 'package:rov_coach/presentation/widgets/hero_avatar.dart';
 
@@ -70,7 +71,7 @@ class _StrategyScreenState extends ConsumerState<StrategyScreen> {
   Widget _buildStrategyList(
       BuildContext context,
       WidgetRef ref,
-      AsyncValue strategyAsync,
+      AsyncValue<List<Strategy>> strategyAsync,
       AsyncValue<List<GameResult>> matchResultsAsync) {
     return strategyAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -119,7 +120,7 @@ class _StrategyScreenState extends ConsumerState<StrategyScreen> {
                       padding: const EdgeInsets.only(top: 6),
                       child: Row(
                         children: strategy.composition.allHeroes
-                            .map((name) => Padding(
+                            .map<Widget>((name) => Padding(
                                   padding: const EdgeInsets.only(right: 4),
                                   child: HeroAvatar.fromName(name, size: 28),
                                 ))
@@ -393,7 +394,7 @@ class _MetaAnalyzerSection extends StatelessWidget {
                       spacing: 6,
                       runSpacing: 6,
                       children: rec.heroes
-                          .map((h) => HeroAvatar.fromName(h, size: 36))
+                        .map<Widget>((h) => HeroAvatar.fromName(h, size: 36))
                           .toList(),
                     ),
                     const SizedBox(height: 8),

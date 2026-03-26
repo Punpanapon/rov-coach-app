@@ -1,16 +1,9 @@
 import 'dart:async';
-import 'dart:js_interop';
 import 'dart:typed_data';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:html' as html;
 
-import 'dart:async';
-import 'dart:js_interop';
-import 'dart:typed_data';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'dart:html' as html;
 
 /// Manages screen + microphone recording, stream merging,
 /// MediaRecorder lifecycle, and Firebase Storage upload with slot overwrite logic.

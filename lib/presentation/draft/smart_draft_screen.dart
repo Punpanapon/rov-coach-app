@@ -2815,6 +2815,7 @@ class _DraftSettingsDialog extends ConsumerWidget {
     final cs = Theme.of(context).colorScheme;
     final panelPos = ref.watch(draftPanelPositionProvider);
     final duoEnabled = ref.watch(isDuoScrollEnabledProvider);
+    final draftState = ref.watch(scrimDraftProvider);
 
     return PointerInterceptor(
       child: AlertDialog(
@@ -2856,6 +2857,60 @@ class _DraftSettingsDialog extends ConsumerWidget {
                       }
                     },
                   )),
+              const Divider(),
+              // ── Draft sequence mode ──
+              Padding(
+                padding: const EdgeInsets.only(left: 16, top: 8, bottom: 4),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text('Draft Sequence Mode',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: cs.onSurfaceVariant,
+                      )),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: SegmentedButton<AutoDraftMode>(
+                  segments: const [
+                    ButtonSegment(
+                      value: AutoDraftMode.firstPick,
+                      label: Text('1st Pick'),
+                      icon: Icon(Icons.looks_one, size: 14),
+                    ),
+                    ButtonSegment(
+                      value: AutoDraftMode.secondPick,
+                      label: Text('2nd Pick'),
+                      icon: Icon(Icons.looks_two, size: 14),
+                    ),
+                    ButtonSegment(
+                      value: AutoDraftMode.custom,
+                      label: Text('Custom'),
+                      icon: Icon(Icons.tune, size: 14),
+                    ),
+                  ],
+                  selected: {draftState.autoDraftMode},
+                  onSelectionChanged: (value) {
+                    ref
+                        .read(scrimDraftProvider.notifier)
+                        .switchAutoDraftMode(value.first);
+                  },
+                ),
+              ),
+              const SizedBox(height: 4),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Text(
+                  draftState.autoDraftMode == AutoDraftMode.custom
+                      ? 'Manual mode: pick/ban can be selected freely.'
+                      : draftState.autoDraftMode == AutoDraftMode.firstPick
+                          ? 'Auto mode: your team takes the first pick sequence.'
+                          : 'Auto mode: enemy team takes the first pick sequence.',
+                  style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                ),
+              ),
               const Divider(),
               // ── Duo Scroll ──
               SwitchListTile(

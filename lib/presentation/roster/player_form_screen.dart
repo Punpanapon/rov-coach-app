@@ -76,9 +76,9 @@ class _PlayerFormScreenState extends ConsumerState<PlayerFormScreen> {
     );
 
     if (_isEditing) {
-      await ref.read(rosterProvider.notifier).updatePlayer(player);
+      await ref.read(rosterActionsProvider).updatePlayer(player);
     } else {
-      await ref.read(rosterProvider.notifier).addPlayer(player);
+      await ref.read(rosterActionsProvider).addPlayer(player);
     }
 
     if (mounted) Navigator.of(context).pop();
@@ -101,7 +101,7 @@ class _PlayerFormScreenState extends ConsumerState<PlayerFormScreen> {
       ),
     );
     if (confirmed == true) {
-      await ref.read(rosterProvider.notifier).removePlayer(widget.player!.id);
+      await ref.read(rosterActionsProvider).removePlayer(widget.player!.id);
       if (mounted) Navigator.of(context).pop();
     }
   }

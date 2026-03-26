@@ -31,4 +31,9 @@ class PlayerRepository {
     final box = await _box;
     await box.delete(id);
   }
+
+  Future<void> clearAll() async {
+    final box = await _box;
+    await box.clear();
+  }
 }

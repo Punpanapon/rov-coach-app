@@ -169,7 +169,7 @@ class _HistoryTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final resultsAsync = ref.watch(gameResultsProvider);
+    final resultsAsync = ref.watch(firestoreMatchResultsProvider);
 
     return resultsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -400,7 +400,7 @@ class _ResultsList extends ConsumerWidget {
           FilledButton(
               onPressed: () {
                 Navigator.pop(ctx);
-                ref.read(gameResultsProvider.notifier).removeResult(r.id);
+                ref.read(gameResultWriterProvider).removeResult(r.id);
               },
               child: const Text('Delete')),
         ],
@@ -1283,7 +1283,7 @@ class _EditResultDialogState extends ConsumerState<_EditResultDialog> {
       note: noteText.isEmpty ? null : noteText,
     );
 
-    await ref.read(gameResultsProvider.notifier).updateResult(updated);
+    await ref.read(gameResultWriterProvider).updateResult(updated);
 
     if (mounted) Navigator.pop(context);
   }
@@ -1497,7 +1497,7 @@ class _AddResultScreenState extends ConsumerState<_AddResultScreen> {
       date: DateTime.now(),
     );
 
-    await ref.read(gameResultsProvider.notifier).addResult(result);
+    await ref.read(gameResultWriterProvider).addResult(result);
 
     if (mounted) Navigator.of(context).pop();
   }

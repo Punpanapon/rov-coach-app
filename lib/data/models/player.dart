@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 import 'package:rov_coach/core/enums/enums.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// Represents a player on the esports roster.
 class Player extends Equatable {
@@ -9,6 +10,7 @@ class Player extends Equatable {
   final String? name;
   final String? role;
   final String status;
+  final bool isActive;
   final List<String> comfortPicks; // Heroes the player has mastered
   final List<String> weakPicks; // Heroes the player needs practice on
 
@@ -19,6 +21,7 @@ class Player extends Equatable {
     this.name,
     this.role,
     this.status = 'Active',
+    this.isActive = false,
     this.comfortPicks = const [],
     this.weakPicks = const [],
   });
@@ -33,6 +36,7 @@ class Player extends Equatable {
     String? name,
     String? role,
     String? status,
+    bool? isActive,
     List<String>? comfortPicks,
     List<String>? weakPicks,
   }) {
@@ -43,6 +47,7 @@ class Player extends Equatable {
       name: name ?? this.name,
       role: role ?? this.role,
       status: status ?? this.status,
+      isActive: isActive ?? this.isActive,
       comfortPicks: comfortPicks ?? this.comfortPicks,
       weakPicks: weakPicks ?? this.weakPicks,
     );
@@ -56,6 +61,7 @@ class Player extends Equatable {
       'name': name ?? ign,
       'role': role ?? mainRole.label,
       'status': status,
+      'isActive': isActive,
       'comfortPicks': comfortPicks,
       'weakPicks': weakPicks,
     };
@@ -71,9 +77,18 @@ class Player extends Equatable {
       name: json['name'] as String?,
       role: json['role'] as String?,
       status: (json['status'] as String?) ?? 'Active',
+      isActive: (json['isActive'] as bool?) ?? false,
       comfortPicks: List<String>.from((json['comfortPicks'] as List?) ?? const []),
       weakPicks: List<String>.from((json['weakPicks'] as List?) ?? const []),
     );
+  }
+
+  factory Player.fromFirestore(DocumentSnapshot<Map<String, dynamic>> doc) {
+    final data = doc.data() ?? const <String, dynamic>{};
+    return Player.fromJson({
+      ...data,
+      'id': doc.id,
+    });
   }
 
   static String _roleNameFromLabel(String? label) {
@@ -95,7 +110,7 @@ class Player extends Equatable {
 
   @override
   List<Object?> get props =>
-      [id, ign, mainRole, name, role, status, comfortPicks, weakPicks];
+      [id, ign, mainRole, name, role, status, isActive, comfortPicks, weakPicks];
 
   @override
   String toString() => 'Player(id: $id, ign: $ign, role: ${mainRole.label})';
