@@ -1441,12 +1441,12 @@ class _TeamGrid extends ConsumerWidget {
         Expanded(
           child: isGroupedView
               ? _buildGroupedView(
-                  context, customRoles, lockedPicks, currentPicks,
-                  currentBans, crossTeamPicks, crossTeamBans,
+                  context, customRoles, currentPicks,
+                  currentBans,
                   tileSize, spacing, cs)
               : _buildFlatGrid(
-                  customRoles, lockedPicks, currentPicks, currentBans,
-                  crossTeamPicks, crossTeamBans, tileSize, spacing),
+                  customRoles, currentPicks, currentBans,
+                  tileSize, spacing),
         ),
       ],
     );
@@ -1455,11 +1455,8 @@ class _TeamGrid extends ConsumerWidget {
   /// Flat grid mode (current dense grid)
   Widget _buildFlatGrid(
     Map<String, String> customRoles,
-    Set<String> lockedPicks,
     Set<String> currentPicks,
     Set<String> currentBans,
-    Set<String> crossTeamPicks,
-    Set<String> crossTeamBans,
     double tileSize,
     double spacing,
   ) {
@@ -1489,11 +1486,8 @@ class _TeamGrid extends ConsumerWidget {
             .map((h) => _HeroTile(
                   hero: h,
                   side: side,
-                  isLocked: lockedPicks.contains(h.name),
                   isCurrentPick: currentPicks.contains(h.name),
                   isBanned: currentBans.contains(h.name),
-                  isCrossTeamBlocked: crossTeamPicks.contains(h.name) ||
-                      crossTeamBans.contains(h.name),
                   tileSize: tileSize,
                 ))
             .toList(),
@@ -1505,11 +1499,8 @@ class _TeamGrid extends ConsumerWidget {
   Widget _buildGroupedView(
     BuildContext context,
     Map<String, String> customRoles,
-    Set<String> lockedPicks,
     Set<String> currentPicks,
     Set<String> currentBans,
-    Set<String> crossTeamPicks,
-    Set<String> crossTeamBans,
     double tileSize,
     double spacing,
     ColorScheme cs,
@@ -1556,12 +1547,8 @@ class _TeamGrid extends ConsumerWidget {
                       .map((h) => _HeroTile(
                             hero: h,
                             side: side,
-                            isLocked: lockedPicks.contains(h.name),
                             isCurrentPick: currentPicks.contains(h.name),
                             isBanned: currentBans.contains(h.name),
-                            isCrossTeamBlocked:
-                                crossTeamPicks.contains(h.name) ||
-                                    crossTeamBans.contains(h.name),
                             tileSize: tileSize,
                           ))
                       .toList(),
@@ -1581,22 +1568,16 @@ class _RoleSection extends StatelessWidget {
   final String role;
   final List<HeroModel> heroes;
   final DraftSide side;
-  final Set<String> lockedPicks;
   final Set<String> currentPicks;
   final Set<String> currentBans;
-  final Set<String> crossTeamPicks;
-  final Set<String> crossTeamBans;
   final double tileSize;
 
   const _RoleSection({
     required this.role,
     required this.heroes,
     required this.side,
-    required this.lockedPicks,
     required this.currentPicks,
     required this.currentBans,
-    required this.crossTeamPicks,
-    required this.crossTeamBans,
     required this.tileSize,
   });
 
@@ -1655,11 +1636,8 @@ class _RoleSection extends StatelessWidget {
                 .map((h) => _HeroTile(
                       hero: h,
                       side: side,
-                      isLocked: lockedPicks.contains(h.name),
                       isCurrentPick: currentPicks.contains(h.name),
                       isBanned: currentBans.contains(h.name),
-                      isCrossTeamBlocked: crossTeamPicks.contains(h.name) ||
-                          crossTeamBans.contains(h.name),
                       tileSize: tileSize,
                     ))
                 .toList(),
@@ -1670,23 +1648,19 @@ class _RoleSection extends StatelessWidget {
   }
 }
 
-// ── Individual hero tile with locked / picked / banned states + pop animation ──
+// ── Individual hero tile with contextual disabled / picked / banned states ──
 class _HeroTile extends ConsumerStatefulWidget {
   final HeroModel hero;
   final DraftSide side;
-  final bool isLocked;
   final bool isCurrentPick;
   final bool isBanned;
-  final bool isCrossTeamBlocked;
   final double tileSize;
 
   const _HeroTile({
     required this.hero,
     required this.side,
-    required this.isLocked,
     required this.isCurrentPick,
     required this.isBanned,
-    required this.isCrossTeamBlocked,
     required this.tileSize,
   });
 
