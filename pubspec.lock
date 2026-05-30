@@ -266,7 +266,7 @@ packages:
     source: hosted
     version: "8.1.7"
   firebase_auth_web:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: firebase_auth_web
       sha256: "809d0807a7b6dbdd2d2dd04f217375aaa9835794750a4eec408c2990ed505e41"
@@ -290,7 +290,7 @@ packages:
     source: hosted
     version: "6.0.2"
   firebase_core_web:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: firebase_core_web
       sha256: "856ca92bf2d75a63761286ab8e791bda3a85184c2b641764433b619647acfca6"
