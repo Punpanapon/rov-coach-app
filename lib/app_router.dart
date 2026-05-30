@@ -1,14 +1,19 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:rov_coach/presentation/auth/dashboard_screen.dart';
+import 'package:rov_coach/presentation/auth/login_screen.dart';
+import 'package:rov_coach/presentation/auth/register_screen.dart';
 import 'package:rov_coach/presentation/roster/roster_screen.dart';
 import 'package:rov_coach/presentation/strategy/strategy_screen.dart';
 import 'package:rov_coach/presentation/draft/smart_draft_screen.dart';
 import 'package:rov_coach/presentation/results/results_screen.dart';
 import 'package:rov_coach/presentation/vod_review/vod_review_screen.dart';
 import 'package:rov_coach/presentation/hall_of_fame/hall_of_fame_screen.dart';
+import 'package:rov_coach/providers/auth_provider.dart';
 import 'package:rov_coach/providers/vod_review_provider.dart';
 
 /// Generates a short, URL-safe alphanumeric room ID (8 chars).
@@ -21,80 +26,137 @@ String _generateRoomId() {
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 final _shellNavigatorKey = GlobalKey<NavigatorState>();
 
-final GoRouter appRouter = GoRouter(
-  navigatorKey: _rootNavigatorKey,
-  initialLocation: '/',
-  redirect: (context, state) {
-    final path = state.uri.path;
+final appRouterProvider = Provider<GoRouter>((ref) {
+  final authService = ref.watch(authServiceProvider);
 
-    // Any route without a room ID → generate one and redirect to roster
-    if (path == '/' || path == '/roster' || path == '/strategies' ||
-        path == '/draft' || path == '/results' || path == '/vod') {
-      return '/room/${_generateRoomId()}/roster';
-    }
-    return null;
-  },
-  routes: [
-    // All tabs live inside /room/:roomId — one room per session
-    ShellRoute(
-      navigatorKey: _shellNavigatorKey,
-      builder: (context, state, child) => AppShell(child: child),
-      routes: [
-        GoRoute(
-          path: '/room/:roomId/roster',
-          pageBuilder: (context, state) {
-            final roomId = state.pathParameters['roomId']!;
-            return NoTransitionPage(
-              child: RosterScreen(roomId: roomId),
-            );
-          },
+  return GoRouter(
+    navigatorKey: _rootNavigatorKey,
+    initialLocation: '/login',
+    refreshListenable: GoRouterRefreshStream(authService.authStateChanges),
+    redirect: (context, state) {
+      final path = state.uri.path;
+      final isLoggedIn = authService.currentUser != null;
+      final isAuthRoute = path == '/login' || path == '/register';
+      final isLegacyRoomShortPath = path == '/roster' ||
+          path == '/strategies' ||
+          path == '/draft' ||
+          path == '/results' ||
+          path == '/vod';
+
+      if (!isLoggedIn) {
+        return isAuthRoute ? null : '/login';
+      }
+
+      if (isLoggedIn && isAuthRoute) {
+        return '/dashboard';
+      }
+
+      if (path == '/') {
+        return '/dashboard';
+      }
+
+      if (isLegacyRoomShortPath) {
+        return '/room/${_generateRoomId()}/roster';
+      }
+
+      return null;
+    },
+    routes: [
+      GoRoute(
+        path: '/login',
+        pageBuilder: (context, state) => const NoTransitionPage(
+          child: LoginScreen(),
         ),
-        GoRoute(
-          path: '/room/:roomId/strategies',
-          pageBuilder: (context, state) {
-            final roomId = state.pathParameters['roomId']!;
-            return NoTransitionPage(
-              child: StrategyScreen(roomId: roomId),
-            );
-          },
+      ),
+      GoRoute(
+        path: '/register',
+        pageBuilder: (context, state) => const NoTransitionPage(
+          child: RegisterScreen(),
         ),
-        GoRoute(
-          path: '/room/:roomId/draft',
-          pageBuilder: (context, state) {
-            final roomId = state.pathParameters['roomId']!;
-            return NoTransitionPage(
-              child: DraftScreen(roomId: roomId),
-            );
-          },
+      ),
+      GoRoute(
+        path: '/dashboard',
+        pageBuilder: (context, state) => const NoTransitionPage(
+          child: DashboardScreen(),
         ),
-        GoRoute(
-          path: '/room/:roomId/results',
-          pageBuilder: (context, state) {
-            final roomId = state.pathParameters['roomId']!;
-            return NoTransitionPage(
-              child: ResultsScreen(roomId: roomId),
-            );
-          },
-        ),
-        GoRoute(
-          path: '/room/:roomId/vod',
-          pageBuilder: (context, state) {
-            final roomId = state.pathParameters['roomId']!;
-            return NoTransitionPage(
-              child: VodReviewScreen(roomId: roomId),
-            );
-          },
-        ),
-        GoRoute(
-          path: '/room/:roomId/fame',
-          pageBuilder: (context, state) => const NoTransitionPage(
-            child: HallOfFameScreen(),
+      ),
+      // All tabs live inside /room/:roomId — one room per session
+      ShellRoute(
+        navigatorKey: _shellNavigatorKey,
+        builder: (context, state, child) => AppShell(child: child),
+        routes: [
+          GoRoute(
+            path: '/room/:roomId/roster',
+            pageBuilder: (context, state) {
+              final roomId = state.pathParameters['roomId']!;
+              return NoTransitionPage(
+                child: RosterScreen(roomId: roomId),
+              );
+            },
           ),
-        ),
-      ],
-    ),
-  ],
-);
+          GoRoute(
+            path: '/room/:roomId/strategies',
+            pageBuilder: (context, state) {
+              final roomId = state.pathParameters['roomId']!;
+              return NoTransitionPage(
+                child: StrategyScreen(roomId: roomId),
+              );
+            },
+          ),
+          GoRoute(
+            path: '/room/:roomId/draft',
+            pageBuilder: (context, state) {
+              final roomId = state.pathParameters['roomId']!;
+              return NoTransitionPage(
+                child: DraftScreen(roomId: roomId),
+              );
+            },
+          ),
+          GoRoute(
+            path: '/room/:roomId/results',
+            pageBuilder: (context, state) {
+              final roomId = state.pathParameters['roomId']!;
+              return NoTransitionPage(
+                child: ResultsScreen(roomId: roomId),
+              );
+            },
+          ),
+          GoRoute(
+            path: '/room/:roomId/vod',
+            pageBuilder: (context, state) {
+              final roomId = state.pathParameters['roomId']!;
+              return NoTransitionPage(
+                child: VodReviewScreen(roomId: roomId),
+              );
+            },
+          ),
+          GoRoute(
+            path: '/room/:roomId/fame',
+            pageBuilder: (context, state) => const NoTransitionPage(
+              child: HallOfFameScreen(),
+            ),
+          ),
+        ],
+      ),
+    ],
+  );
+});
+
+class GoRouterRefreshStream extends ChangeNotifier {
+  late final StreamSubscription<dynamic> _subscription;
+
+  GoRouterRefreshStream(Stream<dynamic> stream) {
+    _subscription = stream.asBroadcastStream().listen((_) {
+      notifyListeners();
+    });
+  }
+
+  @override
+  void dispose() {
+    _subscription.cancel();
+    super.dispose();
+  }
+}
 
 /// Shell widget providing the persistent bottom navigation bar.
 class AppShell extends ConsumerWidget {
